@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set up · Caddy Manager</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --card:#fff; --fg:#1a1c1e; --muted:#6b7280; --border:#e3e6ea;
+    --accent:#2563eb; --accent-fg:#fff; --bad:#dc2626; --ok:#16a34a; --field:#f6f7f9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0e1116; --card:#171b21; --fg:#e6e8eb; --muted:#9aa4b2; --border:#262c34;
+      --accent:#3b82f6; --accent-fg:#fff; --bad:#f87171; --ok:#22c55e; --field:#0e1116;
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, color-mix(in srgb, var(--accent) 14%, transparent), transparent),
+      var(--bg);
+    color:var(--fg); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; padding:20px; }
+  .card { width:100%; max-width:400px; background:var(--card); border:1px solid var(--border);
+    border-radius:16px; padding:30px 28px; box-shadow:0 12px 40px rgba(0,0,0,.10); }
+  .logo { width:46px; height:46px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+    background:var(--accent); color:var(--accent-fg); font-size:24px; margin:0 auto 14px; }
+  h1 { font-size:19px; text-align:center; margin:0 0 4px; font-weight:650; }
+  .sub { text-align:center; color:var(--muted); font-size:13px; margin:0 0 22px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:14px 0 6px; }
+  input { width:100%; padding:11px 13px; border:1px solid var(--border); border-radius:10px;
+    background:var(--field); color:var(--fg); font:inherit; }
+  input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .meter { height:4px; border-radius:3px; background:var(--border); margin-top:8px; overflow:hidden; }
+  .meter > i { display:block; height:100%; width:0; background:var(--bad); transition:width .2s, background .2s; }
+  button { width:100%; margin-top:22px; padding:12px; border:none; border-radius:10px;
+    background:var(--accent); color:var(--accent-fg); font:inherit; font-weight:600; cursor:pointer; }
+  button:hover { filter:brightness(1.05); } button:disabled { opacity:.6; cursor:default; }
+  .msg { display:none; margin-top:16px; padding:10px 12px; border-radius:9px; font-size:13.5px; }
+  .msg.show { display:block; }
+  .msg.err { background:color-mix(in srgb, var(--bad) 14%, transparent); color:var(--bad);
+    border:1px solid color-mix(in srgb, var(--bad) 35%, transparent); }
+  .hint { font-size:12px; color:var(--muted); margin-top:6px; }
+</style>
+</head>
+<body>
+  <form class="card" id="form">
+    <div class="logo">⚙</div>
+    <h1>Welcome to Caddy Manager</h1>
+    <p class="sub">Create your admin account to get started</p>
+    <label for="u">Username</label>
+    <input id="u" name="username" autocomplete="username" placeholder="admin" autofocus>
+    <label for="p">Password</label>
+    <input id="p" name="password" type="password" autocomplete="new-password" placeholder="At least 8 characters">
+    <div class="meter"><i id="bar"></i></div>
+    <label for="c">Confirm password</label>
+    <input id="c" name="confirm" type="password" autocomplete="new-password" placeholder="Repeat password">
+    <button type="submit" id="btn">Create account</button>
+    <div class="msg err" id="msg"></div>
+    <p class="hint">Stored hashed on this server. You can change it later by re-onboarding a fresh install, or via the <code>UI_USER</code>/<code>UI_PASS</code> env override.</p>
+  </form>
+<script>
+  const $ = id => document.getElementById(id);
+  const msg = $('msg'), btn = $('btn'), bar = $('bar');
+  $('p').addEventListener('input', () => {
+    const v = $('p').value; let s = 0;
+    if (v.length >= 8) s++; if (/[A-Z]/.test(v) && /[a-z]/.test(v)) s++;
+    if (/\d/.test(v)) s++; if (/[^A-Za-z0-9]/.test(v)) s++;
+    const pct = [8, 34, 60, 82, 100][Math.min(s, 4)];
+    bar.style.width = (v ? pct : 0) + '%';
+    bar.style.background = s >= 3 ? 'var(--ok)' : (s >= 2 ? 'var(--accent)' : 'var(--bad)');
+  });
+  $('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msg.className = 'msg err';
+    const u = $('u').value.trim(), p = $('p').value, c = $('c').value;
+    if (u.length < 3) return fail('Username must be at least 3 characters.');
+    if (p.length < 8) return fail('Password must be at least 8 characters.');
+    if (p !== c) return fail('Passwords do not match.');
+    btn.disabled = true; btn.textContent = 'Creating…';
+    try {
+      const r = await fetch('/setup', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({username:u, password:p, confirm:c}) });
+      if (r.ok) { location.href = '/'; return; }
+      const j = await r.json().catch(()=>({}));
+      fail(j.error || 'Setup failed.');
+    } catch (ex) { fail('Network error.'); }
+    btn.disabled = false; btn.textContent = 'Create account';
+  });
+  function fail(t){ msg.textContent = t; msg.className = 'msg err show'; }
+</script>
+</body>
+</html>

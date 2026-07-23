@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · Caddy Manager</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --card:#fff; --fg:#1a1c1e; --muted:#6b7280; --border:#e3e6ea;
+    --accent:#2563eb; --accent-fg:#fff; --bad:#dc2626; --field:#f6f7f9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0e1116; --card:#171b21; --fg:#e6e8eb; --muted:#9aa4b2; --border:#262c34;
+      --accent:#3b82f6; --accent-fg:#fff; --bad:#f87171; --field:#0e1116;
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, color-mix(in srgb, var(--accent) 14%, transparent), transparent),
+      var(--bg);
+    color:var(--fg); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; padding:20px; }
+  .card { width:100%; max-width:380px; background:var(--card); border:1px solid var(--border);
+    border-radius:16px; padding:30px 28px; box-shadow:0 12px 40px rgba(0,0,0,.10); }
+  .logo { width:46px; height:46px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+    background:var(--accent); color:var(--accent-fg); font-size:24px; margin:0 auto 14px; }
+  h1 { font-size:19px; text-align:center; margin:0 0 4px; font-weight:650; }
+  .sub { text-align:center; color:var(--muted); font-size:13px; margin:0 0 22px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:14px 0 6px; }
+  input { width:100%; padding:11px 13px; border:1px solid var(--border); border-radius:10px;
+    background:var(--field); color:var(--fg); font:inherit; }
+  input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+  button { width:100%; margin-top:22px; padding:12px; border:none; border-radius:10px;
+    background:var(--accent); color:var(--accent-fg); font:inherit; font-weight:600; cursor:pointer; }
+  button:hover { filter:brightness(1.05); } button:disabled { opacity:.6; cursor:default; }
+  .err { display:none; margin-top:16px; padding:10px 12px; border-radius:9px; font-size:13.5px;
+    background:color-mix(in srgb, var(--bad) 14%, transparent); color:var(--bad);
+    border:1px solid color-mix(in srgb, var(--bad) 35%, transparent); }
+  .err.show { display:block; }
+</style>
+</head>
+<body>
+  <form class="card" id="form" autocomplete="on">
+    <div class="logo">⚙</div>
+    <h1>Caddy Manager</h1>
+    <p class="sub">Sign in to manage your domains</p>
+    <label for="u">Username</label>
+    <input id="u" name="username" autocomplete="username" placeholder="admin" autofocus>
+    <label for="p">Password</label>
+    <input id="p" name="password" type="password" autocomplete="current-password" placeholder="••••••••">
+    <button type="submit" id="btn">Sign in</button>
+    <div class="err" id="err"></div>
+  </form>
+<script>
+  const form = document.getElementById('form');
+  const err = document.getElementById('err');
+  const btn = document.getElementById('btn');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    err.className = 'err'; btn.disabled = true; btn.textContent = 'Signing in…';
+    try {
+      const r = await fetch('/login', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({username: document.getElementById('u').value,
+                              password: document.getElementById('p').value})
+      });
+      if (r.ok) { location.href = '/'; return; }
+      const j = await r.json().catch(()=>({}));
+      err.textContent = j.error || 'Sign in failed.'; err.className = 'err show';
+    } catch (ex) {
+      err.textContent = 'Network error.'; err.className = 'err show';
+    }
+    btn.disabled = false; btn.textContent = 'Sign in';
+  });
+</script>
+</body>
+</html>

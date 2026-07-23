@@ -1,0 +1,31 @@
+name: caddy-manager
+
+services:
+  caddy-manager:
+    build: .
+    image: caddy-manager:latest
+    container_name: caddy-manager
+    restart: unless-stopped
+    environment:
+      # Admin API of your running Caddy (see README: enable `admin :2019`).
+      - CADDY_ADMIN=http://caddy:2019
+      - CADDYFILE_PATH=/caddy/Caddyfile
+      - ROUTES_PATH=/data/routes.json
+      - LISTEN_PORT=8080
+      # Leave UI_USER/UI_PASS unset to use the first-run onboarding screen.
+      # Set BOTH to skip onboarding and use fixed credentials instead:
+      # - UI_USER=admin
+      # - UI_PASS=change-me
+    volumes:
+      # The Caddyfile your running Caddy uses. It must already exist.
+      # In-place writes preserve the inode so a single-file bind stays in sync.
+      - ${CADDYFILE_HOST_PATH:-/etc/caddy/Caddyfile}:/caddy/Caddyfile
+      - ./data:/data
+    networks:
+      - caddy
+
+networks:
+  caddy:
+    external: true
+    # The docker network your Caddy container is attached to.
+    name: ${CADDY_NETWORK:-caddy_default}

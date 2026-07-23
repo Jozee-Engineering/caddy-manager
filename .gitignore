@@ -1,0 +1,11 @@
+# Runtime state — never commit
+data/routes.json
+data/auth.json
+data/*.tmp
+.env
+
+# Python / OS cruft
+__pycache__/
+*.pyc
+._*
+.DS_Store
