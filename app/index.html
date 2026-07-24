@@ -26,7 +26,9 @@
   header .base { color:var(--muted); font-size:13px; }
   header .spacer { flex:1; }
   .dot { width:9px; height:9px; border-radius:50%; display:inline-block; vertical-align:middle; }
-  .dot.ok{background:var(--ok);} .dot.bad{background:var(--bad);} .dot.unk{background:var(--muted);}
+  .dot.ok{background:var(--ok);} .dot.bad{background:var(--bad);} .dot.warn{background:var(--warn);} .dot.unk{background:var(--muted);}
+  .pill { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--muted);
+    border:1px solid var(--border); border-radius:999px; padding:3px 10px; }
   .wrap { max-width:1000px; margin:22px auto; padding:0 16px; }
   .btn { border:1px solid var(--border); background:var(--card); color:var(--fg);
     padding:7px 13px; border-radius:8px; cursor:pointer; font-size:14px; }
@@ -34,6 +36,7 @@
   .btn.primary { background:var(--accent); color:var(--accent-fg); border-color:transparent; }
   .btn.danger { color:var(--bad); }
   .btn.sm { padding:4px 9px; font-size:13px; }
+  .btn.icon { padding:7px 10px; }
   table { width:100%; border-collapse:collapse; background:var(--card);
     border:1px solid var(--border); border-radius:12px; overflow:hidden; }
   th,td { text-align:left; padding:12px 14px; border-bottom:1px solid var(--border); vertical-align:middle; }
@@ -42,6 +45,7 @@
   td.domain { font-weight:600; }
   td.domain a { color:inherit; text-decoration:none; }
   td.domain a:hover { text-decoration:underline; }
+  .note { display:block; font-weight:400; font-size:12px; color:var(--muted); margin-top:2px; }
   .up { color:var(--muted); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; }
   .tag { font-size:11px; color:var(--muted); border:1px solid var(--border); border-radius:6px; padding:1px 6px; margin-left:6px; }
   .actions { display:flex; gap:6px; justify-content:flex-end; }
@@ -54,11 +58,13 @@
   .modal { background:var(--card); border:1px solid var(--border); border-radius:14px;
     width:100%; max-width:560px; padding:22px; }
   .modal h2 { margin:0 0 16px; font-size:17px; }
+  .modal h3 { margin:22px 0 4px; font-size:14px; }
+  hr { border:none; border-top:1px solid var(--border); margin:20px 0; }
   label { display:block; font-size:13px; color:var(--muted); margin:12px 0 5px; }
   input, textarea { width:100%; padding:9px 11px; border:1px solid var(--border);
     border-radius:8px; background:var(--bg); color:var(--fg); font:inherit; }
+  input:disabled, textarea:disabled { opacity:.55; }
   textarea { font-family:ui-monospace,Menlo,monospace; font-size:13px; min-height:64px; resize:vertical; }
-  .row2 { display:flex; gap:12px; } .row2 > div { flex:1; }
   .suffix { display:flex; align-items:center; }
   .suffix input { border-radius:8px 0 0 8px; }
   .suffix span { padding:9px 11px; border:1px solid var(--border); border-left:none;
@@ -72,6 +78,8 @@
   .toast.show { display:block; } .toast.ok{background:var(--ok);} .toast.bad{background:var(--bad);} .toast.warn{background:var(--warn);}
   .empty { text-align:center; color:var(--muted); padding:40px; }
   .hint { font-size:12.5px; color:var(--muted); margin-top:4px; }
+  .banner { font-size:12.5px; color:var(--warn); background:color-mix(in srgb, var(--warn) 12%, transparent);
+    border:1px solid color-mix(in srgb, var(--warn) 30%, transparent); border-radius:8px; padding:8px 11px; margin-top:8px; }
   .switch { cursor:pointer; }
 </style>
 </head>
@@ -80,7 +88,8 @@
   <h1>Caddy Manager</h1>
   <span class="base" id="baseDomain"></span>
   <span class="spacer"></span>
-  <span class="base"><span class="dot unk" id="adminDot"></span> Caddy admin</span>
+  <span class="pill" id="caddyPill" title=""><span class="dot unk" id="adminDot"></span> <span id="adminText">Caddy…</span></span>
+  <button class="btn icon" onclick="openSettings()" title="Settings">⚙</button>
   <button class="btn" onclick="viewCaddyfile()">View Caddyfile</button>
   <button class="btn primary" onclick="openAdd()">+ Add route</button>
   <button class="btn" onclick="logout()" title="Sign out">Log out</button>
@@ -96,11 +105,12 @@
     <thead><tr><th>Domain</th><th>Upstream</th><th>Health</th><th style="text-align:right">Actions</th></tr></thead>
     <tbody id="rows"></tbody>
   </table>
-  <p class="hint">Health is a TCP reachability check to the upstream from this container.
-    Make sure <code id="wildcardHint">*.example.com</code> resolves to this host (a wildcard DNS record).</p>
+  <p class="hint">Health probes the real HTTP response from each upstream (with its Host header), so a
+    running-but-erroring backend shows its status code instead of a bare "down".
+    Make sure <code id="wildcardHint">*.example.com</code> resolves to this host.</p>
 </div>
 
-<!-- edit/add modal -->
+<!-- add/edit route -->
 <div class="modal-bg" id="editBg">
   <div class="modal">
     <h2 id="editTitle">Add route</h2>
@@ -112,12 +122,14 @@
     </div>
     <label>Upstream (host:port)</label>
     <input id="f_up" placeholder="192.168.0.50:3000" autocomplete="off">
-    <p class="hint">Where to send the traffic, e.g. <code>192.168.0.50:3000</code> or <code>https://10.0.0.9:8443</code>.</p>
+    <p class="hint">e.g. <code>192.168.0.50:3000</code> or <code>https://10.0.0.9:8443</code>.</p>
+    <label>Notes <span class="tag">optional</span></label>
+    <input id="f_notes" placeholder="What is this for?" autocomplete="off">
     <details id="adv">
       <summary>Advanced (redirects &amp; headers)</summary>
-      <label>Directives before the proxy <span class="tag">optional</span></label>
+      <label>Directives before the proxy</label>
       <textarea id="f_before" placeholder="redir / /admin/ permanent"></textarea>
-      <label>Directives inside reverse_proxy <span class="tag">optional</span></label>
+      <label>Directives inside reverse_proxy</label>
       <textarea id="f_headers" placeholder="header_up X-Real-IP {remote_host}"></textarea>
       <p class="hint">One directive per line, raw Caddyfile syntax.</p>
     </details>
@@ -128,7 +140,48 @@
   </div>
 </div>
 
-<!-- caddyfile modal -->
+<!-- settings -->
+<div class="modal-bg" id="setBg">
+  <div class="modal">
+    <h2>Settings</h2>
+
+    <h3>Global configuration</h3>
+    <label>Base domain</label>
+    <input id="s_base" placeholder="home.example.com" autocomplete="off">
+    <p class="hint">Routes are served as <code>&lt;subdomain&gt;.&lt;base domain&gt;</code> under <code>*.base</code>.</p>
+    <label>Global directives (Caddyfile global options block)</label>
+    <textarea id="s_global" style="min-height:96px" placeholder="email you@example.com&#10;acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}&#10;admin :2019"></textarea>
+    <p class="hint">One directive per line. Changing these re-applies the whole config.</p>
+    <div class="modal-actions">
+      <button class="btn primary" id="saveGlobalBtn" onclick="saveGlobal()">Save global config</button>
+    </div>
+
+    <hr>
+    <h3>Account</h3>
+    <div id="acctEnvNote" class="banner" style="display:none">
+      Credentials are set via the <code>UI_USER</code>/<code>UI_PASS</code> environment variables, so they can't be changed here.
+    </div>
+    <div id="acctForm">
+      <label>Current password</label>
+      <input id="a_cur" type="password" autocomplete="current-password">
+      <label>Username</label>
+      <input id="a_user" autocomplete="username">
+      <label>New password <span class="tag">leave blank to keep</span></label>
+      <input id="a_pass" type="password" autocomplete="new-password" placeholder="At least 8 characters">
+      <label>Confirm new password</label>
+      <input id="a_conf" type="password" autocomplete="new-password">
+      <div class="modal-actions">
+        <button class="btn primary" id="saveAcctBtn" onclick="saveAccount()">Update account</button>
+      </div>
+    </div>
+
+    <div class="modal-actions" style="margin-top:18px">
+      <button class="btn" onclick="closeModal('setBg')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- caddyfile -->
 <div class="modal-bg" id="cfBg">
   <div class="modal" style="max-width:760px">
     <h2>Generated Caddyfile</h2>
@@ -146,7 +199,7 @@ let HEALTH = {admin:false, routes:{}};
 function toast(msg, kind){
   const t = document.getElementById('toast');
   t.textContent = msg; t.className = 'toast show ' + (kind||'ok');
-  clearTimeout(t._t); t._t = setTimeout(()=>t.className='toast', 4000);
+  clearTimeout(t._t); t._t = setTimeout(()=>t.className='toast', 4500);
 }
 async function api(method, path, body){
   const r = await fetch(path, {method, headers:{'Content-Type':'application/json'},
@@ -167,21 +220,28 @@ async function refresh(){
   render();
   loadHealth();
 }
+function healthOf(id){
+  const h = HEALTH.routes ? HEALTH.routes[id] : null;
+  if(!h) return {cls:'unk', label:'…', title:''};
+  if(!h.reachable) return {cls:'bad', label:'down', title:h.note||''};
+  if(h.status == null) return {cls:'warn', label:'port open', title:h.note||''};
+  const cls = h.status < 400 ? 'ok' : 'warn';
+  return {cls, label:'HTTP '+h.status, title:h.note||''};
+}
 function render(){
   const base = DATA.config.base_domain || 'example.com';
   const tb = document.getElementById('rows');
   if(!DATA.routes.length){ tb.innerHTML = '<tr><td colspan="4" class="empty">No routes yet — add one.</td></tr>'; return; }
   tb.innerHTML = DATA.routes.map(r=>{
     const fqdn = r.subdomain + '.' + base;
-    const h = HEALTH.routes[r.id];
-    const dot = h===true?'ok':(h===false?'bad':'unk');
-    const hlabel = h===true?'reachable':(h===false?'down':'…');
+    const h = healthOf(r.id);
     const extra = (r.before_proxy||r.proxy_headers) ? '<span class="tag">advanced</span>' : '';
     return `<tr class="${r.enabled===false?'disabled':''}">
       <td class="domain"><a href="https://${esc(fqdn)}" target="_blank" rel="noopener">${esc(fqdn)}</a>${extra}
-        ${r.enabled===false?'<span class="tag">disabled</span>':''}</td>
+        ${r.enabled===false?'<span class="tag">disabled</span>':''}
+        ${r.notes?`<span class="note">${esc(r.notes)}</span>`:''}</td>
       <td class="up">${esc(r.upstream)}</td>
-      <td><span class="dot ${dot}"></span> ${hlabel}</td>
+      <td title="${esc(h.title)}"><span class="dot ${h.cls}"></span> ${h.label}</td>
       <td><div class="actions">
         <button class="btn sm switch" onclick="toggle('${r.id}')">${r.enabled===false?'Enable':'Disable'}</button>
         <button class="btn sm" onclick="openEdit('${r.id}')">Edit</button>
@@ -191,13 +251,16 @@ function render(){
 }
 async function loadHealth(){
   try { HEALTH = await api('GET','/api/health'); } catch(e){ return; }
-  document.getElementById('adminDot').className = 'dot ' + (HEALTH.admin?'ok':'bad');
+  const dot = document.getElementById('adminDot'), txt = document.getElementById('adminText');
+  dot.className = 'dot ' + (HEALTH.admin?'ok':'bad');
+  txt.textContent = HEALTH.admin ? 'Caddy connected' : 'Caddy unreachable';
+  document.getElementById('caddyPill').title = (HEALTH.admin_url||'') + (HEALTH.admin?' — admin API reachable':' — admin API not reachable');
   render();
 }
 
 function openAdd(){
   document.getElementById('editTitle').textContent = 'Add route';
-  ['f_id','f_sub','f_up','f_before','f_headers'].forEach(i=>document.getElementById(i).value='');
+  ['f_id','f_sub','f_up','f_notes','f_before','f_headers'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('adv').open = false;
   show('editBg'); document.getElementById('f_sub').focus();
 }
@@ -207,6 +270,7 @@ function openEdit(id){
   document.getElementById('f_id').value = r.id;
   document.getElementById('f_sub').value = r.subdomain;
   document.getElementById('f_up').value = r.upstream;
+  document.getElementById('f_notes').value = r.notes||'';
   document.getElementById('f_before').value = r.before_proxy||'';
   document.getElementById('f_headers').value = r.proxy_headers||'';
   document.getElementById('adv').open = !!(r.before_proxy||r.proxy_headers);
@@ -217,6 +281,7 @@ async function save(){
   const payload = {
     subdomain: document.getElementById('f_sub').value.trim(),
     upstream: document.getElementById('f_up').value.trim(),
+    notes: document.getElementById('f_notes').value,
     before_proxy: document.getElementById('f_before').value,
     proxy_headers: document.getElementById('f_headers').value,
     enabled: true,
@@ -239,6 +304,43 @@ async function del(id){
   try { await api('DELETE','/api/routes/'+id); await refresh(); toast('Deleted.','ok'); }
   catch(e){ toast(e.message,'bad'); }
 }
+
+async function openSettings(){
+  document.getElementById('s_base').value = DATA.config.base_domain || '';
+  document.getElementById('s_global').value = (DATA.config.global_lines||[]).join('\n');
+  try {
+    const a = await api('GET','/api/account');
+    document.getElementById('a_user').value = a.username || '';
+    const env = !!a.env_managed;
+    document.getElementById('acctEnvNote').style.display = env ? 'block' : 'none';
+    document.getElementById('acctForm').style.display = env ? 'none' : 'block';
+  } catch(e){}
+  show('setBg');
+}
+async function saveGlobal(){
+  const btn = document.getElementById('saveGlobalBtn'); btn.disabled = true;
+  try {
+    await api('PUT','/api/config', {
+      base_domain: document.getElementById('s_base').value.trim(),
+      global_lines: document.getElementById('s_global').value,
+    });
+    await refresh(); toast('Global config saved and applied.','ok');
+  } catch(e){ toast(e.message,'bad'); } finally { btn.disabled=false; }
+}
+async function saveAccount(){
+  const btn = document.getElementById('saveAcctBtn'); btn.disabled = true;
+  try {
+    await api('POST','/api/account', {
+      current_password: document.getElementById('a_cur').value,
+      username: document.getElementById('a_user').value.trim(),
+      password: document.getElementById('a_pass').value,
+      confirm: document.getElementById('a_conf').value,
+    });
+    ['a_cur','a_pass','a_conf'].forEach(i=>document.getElementById(i).value='');
+    toast('Account updated.','ok');
+  } catch(e){ toast(e.message,'bad'); } finally { btn.disabled=false; }
+}
+
 async function logout(){
   try { await fetch('/logout', {method:'POST'}); } catch(e){}
   location.href = '/login';

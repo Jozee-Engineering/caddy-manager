@@ -1,0 +1,12 @@
+.git
+.github
+data
+*.md
+.env
+.env.example
+routes.example.json
+__pycache__
+*.pyc
+._*
+.DS_Store
+docker-compose.yml

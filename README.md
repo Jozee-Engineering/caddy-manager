@@ -10,9 +10,13 @@ bad entry is rejected instead of taking your proxy down).
 
 - 🐍 **Zero dependencies** — pure Python standard library, runs on a ~50 MB image.
 - ⚡ **Live apply** — changes hit the running Caddy instantly via `POST /load`; no restart.
-- 🔐 **Own login** — first-run onboarding creates a hashed admin account (or use env credentials).
-- ❤️ **Health checks** — a reachability dot per upstream.
-- 🧩 **Advanced escape hatch** — per-route raw directives for redirects and headers.
+- 🔐 **Own login** — first-run onboarding creates a hashed admin account (or use env credentials),
+  with login rate-limiting and in-app password/username changes.
+- ❤️ **Real health checks** — probes each upstream's actual HTTP status (with its Host header),
+  so a running-but-erroring backend shows `HTTP 502` instead of a bare "down".
+- 🛰️ **Caddy connection status** — a live indicator for the admin-API link.
+- ⚙️ **Editable global config** — email, base domain, `acme_dns`, `admin`, etc. from the UI.
+- 🧩 **Advanced escape hatch** — per-route raw directives for redirects and headers, plus notes.
 - 🌓 Light/dark, responsive, single-file frontend.
 
 ## How it works
@@ -108,8 +112,11 @@ Compose-level: `CADDYFILE_HOST_PATH` (host path of the Caddyfile) and
 - **First run:** no account exists, so you're taken to an onboarding screen to set a
   username + password. The password is stored hashed (PBKDF2-HMAC-SHA256) in `auth.json`.
 - **Env override:** set `UI_USER` and `UI_PASS` to use fixed credentials and skip
-  onboarding entirely — handy for automated/headless deploys.
+  onboarding entirely — handy for automated/headless deploys. (The in-UI account
+  editor is disabled when env credentials are in use.)
+- **Change credentials** anytime from **Settings → Account** (requires your current password).
 - Sessions are stateless HMAC-signed cookies (`HttpOnly`, `Secure`, `SameSite=Strict`).
+- **Rate limiting:** 5 failed logins per IP within 15 minutes triggers a temporary lockout.
 
 ## Security notes
 
@@ -118,6 +125,9 @@ Anyone who can log in can rewrite your whole reverse-proxy config, so:
 - Keep it behind Caddy (HTTPS) and **do not** expose the admin API (`:2019`) to your LAN.
 - Until you complete onboarding, whoever reaches it first can claim the admin account —
   set it up promptly, or use the `UI_USER`/`UI_PASS` override.
+- The container ships with `no-new-privileges` and all Linux capabilities dropped; `auth.json`
+  is written `0600`. If you run behind a reverse proxy other than Caddy, make sure it sets
+  `X-Forwarded-For` so rate-limiting keys on the real client IP.
 
 ## License
 

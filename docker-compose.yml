@@ -6,6 +6,10 @@ services:
     image: caddy-manager:latest
     container_name: caddy-manager
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       # Admin API of your running Caddy (see README: enable `admin :2019`).
       - CADDY_ADMIN=http://caddy:2019

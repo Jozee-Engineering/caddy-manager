@@ -11,7 +11,35 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile & import (stdlib only)
+        run: |
+          python -m py_compile app/server.py
+          python - <<'PY'
+          import os, sys, tempfile
+          os.environ["ROUTES_PATH"] = tempfile.mktemp(suffix=".json")
+          os.environ["AUTH_PATH"] = tempfile.mktemp(suffix=".json")
+          os.environ["CADDYFILE_PATH"] = tempfile.mktemp(suffix=".caddy")
+          sys.path.insert(0, "app")
+          import server
+          server.save_auth("tester", "password123")
+          assert server.check_password("password123")
+          assert not server.check_password("wrong")
+          d = {"config": {"base_domain": "ex.com", "global_lines": ["admin :2019"]},
+               "routes": [{"id": "a", "subdomain": "a", "upstream": "127.0.0.1:9",
+                           "notes": "n", "before_proxy": "", "proxy_headers": "", "enabled": True}]}
+          assert "# note: n" in server.render(d)
+          print("smoke test OK")
+          PY
+
   build-and-push:
+    needs: smoke-test
     runs-on: ubuntu-latest
     permissions:
       contents: read
