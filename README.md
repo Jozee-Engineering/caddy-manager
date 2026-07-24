@@ -86,7 +86,7 @@ To use it in `docker-compose.yml`, replace `build: .` with:
     image: ghcr.io/jozee-engineering/caddy-manager:latest
 ```
 
-Tags: `latest` (tip of `main`), `sha-<commit>`, and `vX.Y[.Z]` for release tags.
+Tags: `latest` (tip of `main`), `sha-<commit>`, and semver tags like `0.1.0` / `0.1` for releases.
 
 ## Configuration
 
