@@ -71,6 +71,23 @@ the config in its own environment.
 > Tip: seed `data/routes.json` from [`routes.example.json`](routes.example.json),
 > or just let the app create a starter file on first run and edit from the UI.
 
+## Prebuilt image
+
+Every push to `main` publishes a multi-arch image (`linux/amd64` + `linux/arm64`)
+to GitHub Container Registry, so you can skip the local build:
+
+```bash
+docker pull ghcr.io/jozee-engineering/caddy-manager:latest
+```
+
+To use it in `docker-compose.yml`, replace `build: .` with:
+
+```yaml
+    image: ghcr.io/jozee-engineering/caddy-manager:latest
+```
+
+Tags: `latest` (tip of `main`), `sha-<commit>`, and `vX.Y[.Z]` for release tags.
+
 ## Configuration
 
 | Env var          | Default                 | Description                                            |
