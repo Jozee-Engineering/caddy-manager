@@ -125,9 +125,11 @@ Anyone who can log in can rewrite your whole reverse-proxy config, so:
 - Keep it behind Caddy (HTTPS) and **do not** expose the admin API (`:2019`) to your LAN.
 - Until you complete onboarding, whoever reaches it first can claim the admin account —
   set it up promptly, or use the `UI_USER`/`UI_PASS` override.
-- The container ships with `no-new-privileges` and all Linux capabilities dropped; `auth.json`
-  is written `0600`. If you run behind a reverse proxy other than Caddy, make sure it sets
-  `X-Forwarded-For` so rate-limiting keys on the real client IP.
+- The container ships with `no-new-privileges` and all Linux capabilities dropped except
+  `DAC_OVERRIDE`/`FOWNER` (needed to write the bind-mounted Caddyfile and `./data`). If those
+  paths are owned by root on the host you can drop those two as well for stricter hardening.
+  `auth.json` is written `0600`. If you run behind a reverse proxy other than Caddy, make sure
+  it sets `X-Forwarded-For` so rate-limiting keys on the real client IP.
 
 ## License
 

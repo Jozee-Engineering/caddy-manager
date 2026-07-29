@@ -10,6 +10,12 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cap_add:
+      # Let the container (root) write the bind-mounted Caddyfile and ./data
+      # regardless of their host ownership. Remove these two for stricter
+      # hardening if both paths are owned by root (uid 0) on the host.
+      - DAC_OVERRIDE
+      - FOWNER
     environment:
       # Admin API of your running Caddy (see README: enable `admin :2019`).
       - CADDY_ADMIN=http://caddy:2019
